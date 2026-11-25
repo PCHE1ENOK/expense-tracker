@@ -144,6 +144,16 @@ test('readGist: данные из ответа Gist, null при отсутст�
   assert.equal(readGist(null), null);
 });
 
+test('прокси входа пересылает только POST с разрешённого origin на известные пути', async () => {
+  const { routeFor } = await import('./worker/proxy.mjs');
+  const ok = 'https://pche1enok.github.io';
+  assert.equal(routeFor(ok, 'POST', '/device/code'), 'https://github.com/login/device/code');
+  assert.equal(routeFor(ok, 'POST', '/oauth/token'), 'https://github.com/login/oauth/access_token');
+  assert.equal(routeFor('https://evil.example', 'POST', '/device/code'), null);
+  assert.equal(routeFor(ok, 'GET', '/device/code'), null);
+  assert.equal(routeFor(ok, 'POST', '/anything'), null);
+});
+
 test('load возвращает [] при битых данных, save/load round-trip', () => {
   const mem = new Map();
   const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };

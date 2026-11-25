@@ -3,6 +3,8 @@ const DEFERRED_KEY = 'expense-tracker-deferred-v1';
 const GIST_FILE = 'expense-tracker.json';
 // Client ID OAuth App (публичный идентификатор, не секрет). Device Flow включён в настройках OAuth App; scope: gist.
 const GITHUB_CLIENT_ID = 'Ov23li7312XCIiWjt9jy';
+// Адрес Cloudflare Worker из worker/proxy.mjs (пересылает запросы входа с CORS). Заполнить после деплоя.
+const GITHUB_PROXY_URL = 'REPLACE_WITH_PROXY_URL';
 const TOKEN_KEY = 'expense-tracker-gh-token';
 const GIST_ID_KEY = 'expense-tracker-gist-id';
 const DEFAULT_CATEGORIES = ['Работа', 'Подарок', 'Заказ', 'Еда', 'Транспорт', 'Покупки'];
@@ -326,16 +328,18 @@ function init() {
   }
 
   async function deviceLogin() {
-    if (GITHUB_CLIENT_ID.startsWith('REPLACE')) throw new Error('Не задан GITHUB_CLIENT_ID');
+    if (GITHUB_CLIENT_ID.startsWith('REPLACE') || GITHUB_PROXY_URL.startsWith('REPLACE')) {
+      throw new Error('Не задан адрес прокси входа (GITHUB_PROXY_URL)');
+    }
     const headers = { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' };
-    const code = await fetch('https://github.com/login/device/code', {
+    const code = await fetch(`${GITHUB_PROXY_URL}/device/code`, {
       method: 'POST',
       headers,
       body: new URLSearchParams({ client_id: GITHUB_CLIENT_ID, scope: 'gist' }),
     })
       .then((r) => r.json())
       .catch(() => {
-        throw new Error('GitHub не отвечает браузеру (CORS): вход через Device Flow здесь не работает');
+        throw new Error('Прокси входа недоступен');
       });
     el.userCode.textContent = code.user_code;
     el.verifyLink.href = code.verification_uri;
@@ -346,7 +350,7 @@ function init() {
     const until = Date.now() + code.expires_in * 1000;
     while (Date.now() < until) {
       await sleep(wait);
-      const t = await fetch('https://github.com/login/oauth/access_token', {
+      const t = await fetch(`${GITHUB_PROXY_URL}/oauth/token`, {
         method: 'POST',
         headers,
         body: new URLSearchParams({
