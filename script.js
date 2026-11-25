@@ -49,6 +49,12 @@ function removeTransaction(items, id) {
   return items.filter((t) => t.id !== id);
 }
 
+// Добавляет записи, id которых ещё нет (для импорта с другого устройства)
+function mergeTransactions(items, incoming) {
+  const known = new Set(items.map((t) => t.id));
+  return [...items, ...incoming.filter((t) => t && t.id && !known.has(t.id))];
+}
+
 function allCategories(items) {
   return [...new Set([...DEFAULT_CATEGORIES, ...items.map((t) => t.category)])].sort((a, b) =>
     a.localeCompare(b, 'ru')
@@ -64,6 +70,8 @@ function init() {
   const $ = (id) => document.getElementById(id);
   const el = {
     month: $('month'),
+    export: $('export'),
+    import: $('import'),
     income: $('income'),
     expense: $('expense'),
     balance: $('balance'),
@@ -181,6 +189,30 @@ function init() {
 
   el.month.addEventListener('input', render);
 
+  el.export.addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `expenses-${todayLocal()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  el.import.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const incoming = JSON.parse(await file.text());
+      if (!Array.isArray(incoming)) throw new Error('not an array');
+      const before = items.length;
+      commit(mergeTransactions(items, incoming));
+      alert(`Добавлено записей: ${items.length - before}`);
+    } catch {
+      alert('Не удалось прочитать файл. Нужен JSON, сохранённый этим приложением.');
+    }
+  });
+
   // Real-time: обновляем при изменениях из другой вкладки
   window.addEventListener('storage', (e) => {
     if (e.key === STORAGE_KEY) {
@@ -195,5 +227,5 @@ function init() {
 if (typeof document !== 'undefined') {
   init();
 } else {
-  module.exports = { load, save, monthOf, summarize, addTransaction, removeTransaction, allCategories };
+  module.exports = { load, save, monthOf, summarize, addTransaction, removeTransaction, mergeTransactions, allCategories };
 }

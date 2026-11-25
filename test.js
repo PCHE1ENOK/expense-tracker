@@ -1,6 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarize, addTransaction, removeTransaction, monthOf, load, save } = require('./script.js');
+const { summarize, addTransaction, removeTransaction, mergeTransactions, monthOf, load, save } = require('./script.js');
+
+test('mergeTransactions добавляет только новые id', () => {
+  const incoming = [sample[0], { id: 'x', type: 'income', amount: 1, category: 'Еда', date: '2026-11-02' }];
+  const merged = mergeTransactions(sample, incoming);
+  assert.equal(merged.length, sample.length + 1);
+  assert.equal(merged.at(-1).id, 'x');
+});
 
 const sample = [
   { id: '1', type: 'expense', amount: 500, category: 'Работа', date: '2026-11-03' },
