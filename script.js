@@ -178,7 +178,7 @@ function init() {
     el.income.textContent = fmt(sIncome.income);
     el.expense.textContent = fmt(sExpense.expense);
     el.balance.textContent = fmt(s.balance);
-    el.total.textContent = fmtNum(s.total);
+    el.total.textContent = fmt(s.total);
 
     let acc = 0;
     const stops = s.top.map((c, i) => {
