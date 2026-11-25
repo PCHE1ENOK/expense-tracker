@@ -1,8 +1,5 @@
 const STORAGE_KEY = 'expense-tracker-v1';
 const DEFERRED_KEY = 'expense-tracker-deferred-v1';
-const GIST_FILE = 'expense-tracker.json';
-// Client ID OAuth App с включённым Device Flow (scope: gist). Заполнить вручную.
-const GITHUB_CLIENT_ID = 'REPLACE_WITH_CLIENT_ID';
 const DEFAULT_CATEGORIES = ['Работа', 'Подарок', 'Заказ', 'Еда', 'Транспорт', 'Покупки'];
 const COLORS = ['#4DD4F5', '#5B7CFA', '#8C97F7', '#B9A7FF', '#F7A8C9', '#7FE6D0', '#A3C4FF', '#E8EAFF'];
 
@@ -95,35 +92,6 @@ function parseImport(data) {
     };
   }
   throw new Error('bad import');
-}
-
-// Слияние локальных данных и данных из Gist: записи по id, без дублей
-function mergeData(local, remote) {
-  return {
-    transactions: mergeTransactions(local.transactions, remote.transactions),
-    deferred: mergeTransactions(local.deferred, remote.deferred),
-  };
-}
-
-// Тело запроса к GitHub Gists API: один файл expense-tracker.json; при создании gist приватный
-function gistBody(data, create = false) {
-  const body = { files: { [GIST_FILE]: { content: JSON.stringify(data, null, 2) } } };
-  if (create) {
-    body.description = 'Учёт расходов и доходов';
-    body.public = false;
-  }
-  return body;
-}
-
-// Данные из ответа GET /gists/{id}; null, если файла нет или он не читается
-function readGist(gist) {
-  const file = gist && gist.files && gist.files[GIST_FILE];
-  if (!file || typeof file.content !== 'string') return null;
-  try {
-    return parseImport(JSON.parse(file.content));
-  } catch {
-    return null;
-  }
 }
 
 function allCategories(items) {
@@ -458,8 +426,5 @@ if (typeof document !== 'undefined') {
     allCategories,
     toExpense,
     parseImport,
-    mergeData,
-    gistBody,
-    readGist,
   };
 }

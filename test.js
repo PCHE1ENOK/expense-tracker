@@ -10,9 +10,6 @@ const {
   save,
   toExpense,
   parseImport,
-  mergeData,
-  gistBody,
-  readGist,
 } = require('./script.js');
 
 const sample = [
@@ -110,38 +107,6 @@ test('load/save с отдельным ключом не смешивает за�
   save(storage, [{ id: 'd1', name: 'Книга', amount: 800 }], 'expense-tracker-deferred-v1');
   assert.deepEqual(load(storage), sample);
   assert.deepEqual(load(storage, 'expense-tracker-deferred-v1'), [{ id: 'd1', name: 'Книга', amount: 800 }]);
-});
-
-test('mergeData объединяет записи и отложенное по id без дублей', () => {
-  const local = { transactions: sample, deferred: [{ id: 'd1', name: 'Книга', amount: 800 }] };
-  const remote = {
-    transactions: [sample[0], { id: 'r1', type: 'income', amount: 100, category: 'Еда', date: '2026-11-02' }],
-    deferred: [{ id: 'd2', name: 'Чайник', amount: 150 }],
-  };
-  const m = mergeData(local, remote);
-  assert.equal(m.transactions.length, sample.length + 1);
-  assert.equal(m.transactions.at(-1).id, 'r1');
-  assert.deepEqual(m.deferred.map((d) => d.id), ['d1', 'd2']);
-});
-
-test('gistBody: при создании приватный gist с одним файлом, при обновлении только файлы', () => {
-  const data = { transactions: sample, deferred: [] };
-  const created = gistBody(data, true);
-  assert.equal(created.public, false);
-  assert.deepEqual(Object.keys(created.files), ['expense-tracker.json']);
-  assert.deepEqual(JSON.parse(created.files['expense-tracker.json'].content), data);
-  const updated = gistBody(data);
-  assert.equal('public' in updated, false);
-  assert.deepEqual(Object.keys(updated), ['files']);
-});
-
-test('readGist: данные из ответа Gist, null при отсутствии или битом файле', () => {
-  const data = { transactions: sample, deferred: [] };
-  const gist = { files: { 'expense-tracker.json': { content: JSON.stringify(data) } } };
-  assert.deepEqual(readGist(gist), data);
-  assert.equal(readGist({ files: { 'other.txt': { content: '{}' } } }), null);
-  assert.equal(readGist({ files: { 'expense-tracker.json': { content: '{broken' } } }), null);
-  assert.equal(readGist(null), null);
 });
 
 test('load возвращает [] при битых данных, save/load round-trip', () => {
