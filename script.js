@@ -1,8 +1,8 @@
 const STORAGE_KEY = 'expense-tracker-v1';
 const DEFERRED_KEY = 'expense-tracker-deferred-v1';
 const GIST_FILE = 'expense-tracker.json';
-// Client ID OAuth App (публичный идентификатор, не секрет). Device Flow включён в настройках OAuth App; scope: gist.
-const GITHUB_CLIENT_ID = 'Ov23li7312XCIiWjt9jy';
+// Client ID OAuth App с включённым Device Flow (scope: gist). Заполнить вручную.
+const GITHUB_CLIENT_ID = 'REPLACE_WITH_CLIENT_ID';
 const TOKEN_KEY = 'expense-tracker-gh-token';
 const GIST_ID_KEY = 'expense-tracker-gist-id';
 const DEFAULT_CATEGORIES = ['Работа', 'Подарок', 'Заказ', 'Еда', 'Транспорт', 'Покупки'];
@@ -332,11 +332,7 @@ function init() {
       method: 'POST',
       headers,
       body: new URLSearchParams({ client_id: GITHUB_CLIENT_ID, scope: 'gist' }),
-    })
-      .then((r) => r.json())
-      .catch(() => {
-        throw new Error('GitHub не отвечает браузеру (CORS): вход через Device Flow здесь не работает');
-      });
+    }).then((r) => r.json());
     el.userCode.textContent = code.user_code;
     el.verifyLink.href = code.verification_uri;
     el.verifyLink.textContent = code.verification_uri;
