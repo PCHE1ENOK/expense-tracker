@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'expense-tracker-v1';
 const DEFAULT_CATEGORIES = ['Работа', 'Подарок', 'Заказ', 'Еда', 'Транспорт', 'Покупки'];
-const COLORS = ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#38d9a9', '#4dabf7', '#9775fa', '#f783ac'];
+const COLORS = ['#4DD4F5', '#5B7CFA', '#8C97F7', '#B9A7FF', '#F7A8C9', '#7FE6D0', '#A3C4FF', '#E8EAFF'];
 
 function load(storage) {
   try {
