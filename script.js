@@ -219,6 +219,28 @@ function init() {
     render();
   });
 
+  const syncFormPicks = () => {
+    document.querySelectorAll('[data-type]').forEach((b) =>
+      b.classList.toggle('active', b.dataset.type === el.type.value)
+    );
+    document.querySelectorAll('.pick').forEach((b) =>
+      b.classList.toggle('active', b.dataset.cat === el.category.value.trim())
+    );
+  };
+  document.querySelectorAll('[data-type]').forEach((b) =>
+    b.addEventListener('click', () => {
+      el.type.value = b.dataset.type;
+      syncFormPicks();
+    })
+  );
+  document.querySelectorAll('.pick').forEach((b) =>
+    b.addEventListener('click', () => {
+      el.category.value = b.dataset.cat;
+      syncFormPicks();
+    })
+  );
+  el.category.addEventListener('input', syncFormPicks);
+
   el.form.addEventListener('submit', (e) => {
     e.preventDefault();
     const amount = Number(el.amount.value);
