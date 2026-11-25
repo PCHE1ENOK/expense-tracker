@@ -103,9 +103,10 @@ ul { list-style: none; margin: 0; padding: 0; }
 .col.active { opacity: 1; border-color: var(--accent); }
 .col h3 { margin: 0 0 8px; font-size: .85rem; font-weight: 600; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .col h3 strong { font-size: 1.05rem; color: var(--text); }
-.col .cat { grid-template-columns: 10px 1fr auto; gap: 8px; padding: 6px 0; }
+.col .cat { grid-template-columns: 10px 1fr; column-gap: 8px; row-gap: 0; padding: 6px 0; }
+.col .cat .dot { grid-row: 1 / 3; align-self: center; }
 .col .cat .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col .cat .amount { font-size: .85rem; }
+.col .cat .amount { font-size: .85rem; grid-column: 2; }
 .donut {
   width: 200px; height: 200px; border-radius: 50%; position: relative;
   display: grid; place-items: center;
