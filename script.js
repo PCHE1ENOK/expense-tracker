@@ -1,17 +1,18 @@
 const STORAGE_KEY = 'expense-tracker-v1';
+const DEFERRED_KEY = 'expense-tracker-deferred-v1';
 const DEFAULT_CATEGORIES = ['Работа', 'Подарок', 'Заказ', 'Еда', 'Транспорт', 'Покупки'];
 const COLORS = ['#4DD4F5', '#5B7CFA', '#8C97F7', '#B9A7FF', '#F7A8C9', '#7FE6D0', '#A3C4FF', '#E8EAFF'];
 
-function load(storage) {
+function load(storage, key = STORAGE_KEY) {
   try {
-    return JSON.parse(storage.getItem(STORAGE_KEY)) || [];
+    return JSON.parse(storage.getItem(key)) || [];
   } catch {
     return [];
   }
 }
 
-function save(storage, items) {
-  storage.setItem(STORAGE_KEY, JSON.stringify(items));
+function save(storage, items, key = STORAGE_KEY) {
+  storage.setItem(key, JSON.stringify(items));
 }
 
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -76,6 +77,23 @@ function mergeTransactions(items, incoming) {
   return [...items, ...incoming.filter((t) => t && t.id && !known.has(t.id))];
 }
 
+// Отложенная покупка → расход на дату date (название становится категорией)
+function toExpense(item, date) {
+  return { type: 'expense', amount: item.amount, category: item.name, date, note: item.note || '' };
+}
+
+// Файл экспорта: { transactions, deferred }; старый формат — просто массив записей
+function parseImport(data) {
+  if (Array.isArray(data)) return { transactions: data, deferred: [] };
+  if (data && typeof data === 'object') {
+    return {
+      transactions: Array.isArray(data.transactions) ? data.transactions : [],
+      deferred: Array.isArray(data.deferred) ? data.deferred : [],
+    };
+  }
+  throw new Error('bad import');
+}
+
 function allCategories(items) {
   return [...new Set([...DEFAULT_CATEGORIES, ...items.map((t) => t.category)])].sort((a, b) =>
     a.localeCompare(b, 'ru')
@@ -109,13 +127,20 @@ function init() {
     note: $('note'),
     categories: $('categories'),
     list: $('list'),
+    listTitle: $('listTitle'),
+    formTitle: $('formTitle'),
+    dform: $('dform'),
+    dname: $('dname'),
+    damount: $('damount'),
+    dnote: $('dnote'),
   };
 
   const fmt = (n) =>
     n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
 
-  const state = { kind: 'expense', period: 'month', anchor: todayLocal() };
+  const state = { kind: 'expense', period: 'month', anchor: todayLocal(), view: 'records' };
   let items = load(localStorage);
+  let deferredItems = load(localStorage, DEFERRED_KEY);
   el.anchor.value = state.anchor;
   el.date.value = todayLocal();
 
@@ -127,9 +152,17 @@ function init() {
   }
 
   function render() {
+    const deferredView = state.view === 'deferred';
     document.querySelectorAll('[data-kind]').forEach((b) =>
-      b.classList.toggle('active', b.dataset.kind === state.kind)
+      b.classList.toggle('active', !deferredView && b.dataset.kind === state.kind)
     );
+    document.querySelectorAll('[data-view]').forEach((b) =>
+      b.classList.toggle('active', deferredView)
+    );
+    el.form.hidden = deferredView;
+    el.dform.hidden = !deferredView;
+    el.formTitle.textContent = deferredView ? 'Отложенная покупка' : 'Новая запись';
+    el.listTitle.textContent = deferredView ? 'Отложенные покупки' : 'Записи';
     document.querySelectorAll('[data-period]').forEach((b) =>
       b.classList.toggle('active', b.dataset.period === state.period)
     );
@@ -180,6 +213,26 @@ function init() {
     catList(el.incomeCats, sIncome.top);
     catList(el.expenseCats, sExpense.top);
 
+    if (deferredView) {
+      el.list.replaceChildren(
+        ...(deferredItems.length
+          ? deferredItems.map((d) => {
+              const row = node('li', undefined, 'drow');
+              const info = node('div', undefined, 'dinfo');
+              info.append(node('span', d.name), node('span', d.note || '', 'muted'));
+              const buy = node('button', 'Купил', 'buy');
+              buy.dataset.id = d.id;
+              const del = node('button', '✕', 'del');
+              del.dataset.id = d.id;
+              del.title = 'Удалить';
+              row.append(info, node('span', fmt(d.amount), 'amt'), buy, del);
+              return row;
+            })
+          : [node('li', 'Отложенных покупок нет', 'muted')])
+      );
+      return;
+    }
+
     el.list.replaceChildren(
       ...(s.transactions.length
         ? s.transactions.map((t) => {
@@ -206,9 +259,22 @@ function init() {
     render();
   }
 
+  function commitDeferred(next) {
+    deferredItems = next;
+    save(localStorage, deferredItems, DEFERRED_KEY);
+    render();
+  }
+
   document.querySelectorAll('[data-kind]').forEach((b) =>
     b.addEventListener('click', () => {
       state.kind = b.dataset.kind;
+      state.view = 'records';
+      render();
+    })
+  );
+  document.querySelectorAll('[data-view]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.view = state.view === 'deferred' ? 'records' : 'deferred';
       render();
     })
   );
@@ -271,18 +337,45 @@ function init() {
     el.amount.focus();
   });
 
+  el.dform.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amount = Number(el.damount.value);
+    const name = el.dname.value.trim();
+    if (!(amount > 0) || !name) return;
+
+    commitDeferred(addTransaction(deferredItems, { name, amount, note: el.dnote.value.trim() }));
+    el.dname.value = '';
+    el.damount.value = '';
+    el.dnote.value = '';
+    el.dname.focus();
+  });
+
   el.fab.addEventListener('click', () => {
-    el.form.scrollIntoView({ behavior: 'smooth' });
-    el.amount.focus();
+    const target = state.view === 'deferred' ? el.dform : el.form;
+    target.scrollIntoView({ behavior: 'smooth' });
+    (state.view === 'deferred' ? el.dname : el.amount).focus();
   });
 
   el.list.addEventListener('click', (e) => {
-    const btn = e.target.closest('.del');
-    if (btn) commit(removeTransaction(items, btn.dataset.id));
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (state.view === 'deferred') {
+      if (btn.classList.contains('buy')) {
+        const item = deferredItems.find((d) => d.id === btn.dataset.id);
+        if (!item) return;
+        commit(addTransaction(items, toExpense(item, todayLocal())));
+        commitDeferred(removeTransaction(deferredItems, btn.dataset.id));
+      } else if (btn.classList.contains('del')) {
+        commitDeferred(removeTransaction(deferredItems, btn.dataset.id));
+      }
+      return;
+    }
+    if (btn.classList.contains('del')) commit(removeTransaction(items, btn.dataset.id));
   });
 
   el.export.addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    const data = { transactions: items, deferred: deferredItems };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `expenses-${todayLocal()}.json`;
@@ -295,11 +388,14 @@ function init() {
     e.target.value = '';
     if (!file) return;
     try {
-      const incoming = JSON.parse(await file.text());
-      if (!Array.isArray(incoming)) throw new Error('not an array');
-      const before = items.length;
-      commit(mergeTransactions(items, incoming));
-      alert(`Добавлено записей: ${items.length - before}`);
+      const { transactions, deferred } = parseImport(JSON.parse(await file.text()));
+      const before = items.length + deferredItems.length;
+      items = mergeTransactions(items, transactions);
+      deferredItems = mergeTransactions(deferredItems, deferred);
+      save(localStorage, items);
+      save(localStorage, deferredItems, DEFERRED_KEY);
+      render();
+      alert(`Добавлено записей: ${items.length + deferredItems.length - before}`);
     } catch {
       alert('Не удалось прочитать файл. Нужен JSON, сохранённый этим приложением.');
     }
@@ -307,10 +403,10 @@ function init() {
 
   // Real-time: обновляем при изменениях из другой вкладки
   window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY) {
-      items = load(localStorage);
-      render();
-    }
+    if (e.key === STORAGE_KEY) items = load(localStorage);
+    else if (e.key === DEFERRED_KEY) deferredItems = load(localStorage, DEFERRED_KEY);
+    else return;
+    render();
   });
 
   render();
@@ -328,5 +424,7 @@ if (typeof document !== 'undefined') {
     removeTransaction,
     mergeTransactions,
     allCategories,
+    toExpense,
+    parseImport,
   };
 }

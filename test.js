@@ -8,6 +8,8 @@ const {
   periodRange,
   load,
   save,
+  toExpense,
+  parseImport,
 } = require('./script.js');
 
 const sample = [
@@ -73,6 +75,38 @@ test('mergeTransactions добавляет только новые id', () => {
   const merged = mergeTransactions(sample, incoming);
   assert.equal(merged.length, sample.length + 1);
   assert.equal(merged.at(-1).id, 'x');
+});
+
+test('отложенная покупка: добавление, перевод в расход и удаление не трогают записи', () => {
+  const deferred = addTransaction([], { name: 'Наушники', amount: '4990', note: 'после премии' });
+  assert.equal(deferred.length, 1);
+  assert.equal(deferred[0].amount, 4990);
+  assert.ok(deferred[0].id);
+
+  const expense = toExpense(deferred[0], '2026-11-25');
+  assert.deepEqual(expense, { type: 'expense', amount: 4990, category: 'Наушники', date: '2026-11-25', note: 'после премии' });
+
+  const records = addTransaction(sample, expense);
+  assert.equal(records.length, sample.length + 1);
+  assert.equal(summarize(records, '2026-11-01', '2026-11-30').expense, 6990);
+  assert.equal(removeTransaction(deferred, deferred[0].id).length, 0);
+});
+
+test('parseImport: старый массив и новый объект с отложенным', () => {
+  assert.deepEqual(parseImport(sample), { transactions: sample, deferred: [] });
+  const d = [{ id: 'd1', name: 'Книга', amount: 800 }];
+  assert.deepEqual(parseImport({ transactions: sample, deferred: d }), { transactions: sample, deferred: d });
+  assert.deepEqual(parseImport({}), { transactions: [], deferred: [] });
+  assert.throws(() => parseImport('нет'));
+});
+
+test('load/save с отдельным ключом не смешивает записи и отложенное', () => {
+  const mem = new Map();
+  const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  save(storage, sample);
+  save(storage, [{ id: 'd1', name: 'Книга', amount: 800 }], 'expense-tracker-deferred-v1');
+  assert.deepEqual(load(storage), sample);
+  assert.deepEqual(load(storage, 'expense-tracker-deferred-v1'), [{ id: 'd1', name: 'Книга', amount: 800 }]);
 });
 
 test('load возвращает [] при битых данных, save/load round-trip', () => {
