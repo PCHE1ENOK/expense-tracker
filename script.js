@@ -99,7 +99,8 @@ function init() {
     balance: $('balance'),
     total: $('total'),
     donut: $('donut'),
-    cats: $('cats'),
+    incomeCats: $('incomeCats'),
+    expenseCats: $('expenseCats'),
     form: $('form'),
     type: $('type'),
     amount: $('amount'),
@@ -132,12 +133,17 @@ function init() {
     document.querySelectorAll('[data-period]').forEach((b) =>
       b.classList.toggle('active', b.dataset.period === state.period)
     );
+    document.querySelectorAll('.col').forEach((c) =>
+      c.classList.toggle('active', c.dataset.col === state.kind)
+    );
 
     const { from, to } = periodRange(state.period, state.anchor);
     const s = summarize(items, from, to, state.kind);
+    const sIncome = summarize(items, from, to, 'income');
+    const sExpense = summarize(items, from, to, 'expense');
 
-    el.income.textContent = fmt(s.income);
-    el.expense.textContent = fmt(s.expense);
+    el.income.textContent = fmt(sIncome.income);
+    el.expense.textContent = fmt(sExpense.expense);
     el.balance.textContent = fmt(s.balance);
     el.total.textContent = fmt(s.total);
 
@@ -159,22 +165,20 @@ function init() {
       })
     );
 
-    el.cats.replaceChildren(
-      ...(s.top.length
-        ? s.top.map((c, i) => {
-            const dot = node('span', '', 'dot');
-            dot.style.background = COLORS[i % COLORS.length];
-            const row = node('li', undefined, 'cat');
-            row.append(
-              dot,
-              node('span', c.category, 'name'),
-              node('span', (c.share * 100).toFixed(0) + '%', 'muted'),
-              node('span', fmt(c.amount), 'amount')
-            );
-            return row;
-          })
-        : [node('li', 'Записей за период нет', 'muted')])
-    );
+    const catList = (ul, top) =>
+      ul.replaceChildren(
+        ...(top.length
+          ? top.map((c, i) => {
+              const dot = node('span', '', 'dot');
+              dot.style.background = COLORS[i % COLORS.length];
+              const row = node('li', undefined, 'cat');
+              row.append(dot, node('span', c.category, 'name'), node('span', fmt(c.amount), 'amount'));
+              return row;
+            })
+          : [node('li', 'Нет записей', 'muted')])
+      );
+    catList(el.incomeCats, sIncome.top);
+    catList(el.expenseCats, sExpense.top);
 
     el.list.replaceChildren(
       ...(s.transactions.length
@@ -205,6 +209,12 @@ function init() {
   document.querySelectorAll('[data-kind]').forEach((b) =>
     b.addEventListener('click', () => {
       state.kind = b.dataset.kind;
+      render();
+    })
+  );
+  document.querySelectorAll('.col').forEach((c) =>
+    c.addEventListener('click', () => {
+      state.kind = c.dataset.col;
       render();
     })
   );

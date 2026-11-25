@@ -94,8 +94,18 @@ ul { list-style: none; margin: 0; padding: 0; }
 .toolbar { margin-bottom: 16px; }
 .toolbar input { width: 100%; }
 
-.summary { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: center; }
-@media (max-width: 600px) { .summary { grid-template-columns: 1fr; justify-items: center; } }
+.summary { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+.col {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+  cursor: pointer; opacity: .65; transition: opacity .15s, border-color .15s;
+}
+.col.active { opacity: 1; border-color: var(--accent); }
+.col h3 { margin: 0 0 8px; font-size: .85rem; font-weight: 600; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.col h3 strong { font-size: 1.05rem; color: var(--text); }
+.col .cat { grid-template-columns: 10px 1fr auto; gap: 8px; padding: 6px 0; }
+.col .cat .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col .cat .amount { font-size: .85rem; }
 .donut {
   width: 200px; height: 200px; border-radius: 50%; position: relative;
   display: grid; place-items: center;

@@ -36,12 +36,19 @@
 
     <section class="panel summary">
       <div id="donut" class="donut"><span id="total">0 ₽</span></div>
-      <ul id="cats" class="cats"></ul>
+      <div class="cols">
+        <div class="col" data-col="income">
+          <h3><span>Доходы</span><strong id="income" class="income">0</strong></h3>
+          <ul id="incomeCats" class="cats"></ul>
+        </div>
+        <div class="col" data-col="expense">
+          <h3><span>Расходы</span><strong id="expense" class="expense">0</strong></h3>
+          <ul id="expenseCats" class="cats"></ul>
+        </div>
+      </div>
     </section>
 
     <section class="cards">
-      <div class="card"><span>Доходы</span><strong id="income" class="income">0</strong></div>
-      <div class="card"><span>Расходы</span><strong id="expense" class="expense">0</strong></div>
       <div class="card"><span>Баланс</span><strong id="balance">0</strong></div>
     </section>
 
