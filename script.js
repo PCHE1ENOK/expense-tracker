@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'expense-tracker-v1';
 const DEFAULT_CATEGORIES = ['Работа', 'Подарок', 'Заказ', 'Еда', 'Транспорт', 'Покупки'];
+const COLORS = ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#38d9a9', '#4dabf7', '#9775fa', '#f783ac'];
 
 function load(storage) {
   try {
@@ -13,31 +14,51 @@ function save(storage, items) {
   storage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-function monthOf(date) {
-  return date.slice(0, 7);
+const iso = (d) => d.toISOString().slice(0, 10);
+
+// Диапазон дат [from, to] (YYYY-MM-DD) для периода, который содержит дату anchor
+function periodRange(period, anchor) {
+  const d = new Date(anchor + 'T00:00:00Z');
+  if (period === 'day') return { from: anchor, to: anchor };
+  if (period === 'week') {
+    const start = new Date(d);
+    start.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 6);
+    return { from: iso(start), to: iso(end) };
+  }
+  if (period === 'month') {
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth();
+    return { from: iso(new Date(Date.UTC(y, m, 1))), to: iso(new Date(Date.UTC(y, m + 1, 0))) };
+  }
+  const y = d.getUTCFullYear();
+  return { from: `${y}-01-01`, to: `${y}-12-31` };
 }
 
-function summarize(items, month) {
-  const inMonth = items.filter((t) => monthOf(t.date) === month);
+// kind — какой тип попадает в список и диаграмму; доходы/расходы считаются всегда
+function summarize(items, from, to, kind = 'expense') {
   let income = 0;
   let expense = 0;
   const byCategory = new Map();
+  const transactions = [];
 
-  for (const t of inMonth) {
-    if (t.type === 'income') {
-      income += t.amount;
-    } else {
-      expense += t.amount;
-      byCategory.set(t.category, (byCategory.get(t.category) || 0) + t.amount);
-    }
+  for (const t of items) {
+    if (t.date < from || t.date > to) continue;
+    if (t.type === 'income') income += t.amount;
+    else expense += t.amount;
+    if (t.type !== kind) continue;
+    transactions.push(t);
+    byCategory.set(t.category, (byCategory.get(t.category) || 0) + t.amount);
   }
 
+  const total = kind === 'income' ? income : expense;
   const top = [...byCategory]
     .sort((a, b) => b[1] - a[1])
-    .map(([category, amount]) => ({ category, amount, share: amount / expense }));
+    .map(([category, amount]) => ({ category, amount, share: amount / total }));
 
-  const transactions = inMonth.sort((a, b) => b.date.localeCompare(a.date));
-  return { income, expense, balance: income - expense, top, transactions };
+  transactions.sort((a, b) => b.date.localeCompare(a.date));
+  return { income, expense, balance: income - expense, total, top, transactions };
 }
 
 function addTransaction(items, t) {
@@ -69,12 +90,16 @@ function todayLocal() {
 function init() {
   const $ = (id) => document.getElementById(id);
   const el = {
-    month: $('month'),
+    anchor: $('anchor'),
     export: $('export'),
     import: $('import'),
+    fab: $('fab'),
     income: $('income'),
     expense: $('expense'),
     balance: $('balance'),
+    total: $('total'),
+    donut: $('donut'),
+    cats: $('cats'),
     form: $('form'),
     type: $('type'),
     amount: $('amount'),
@@ -82,77 +107,92 @@ function init() {
     date: $('date'),
     note: $('note'),
     categories: $('categories'),
-    top: $('top'),
     list: $('list'),
   };
 
   const fmt = (n) =>
     n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
 
+  const state = { kind: 'expense', period: 'month', anchor: todayLocal() };
   let items = load(localStorage);
-  el.month.value = monthOf(todayLocal());
+  el.anchor.value = state.anchor;
   el.date.value = todayLocal();
 
-  function li(...children) {
-    const node = document.createElement('li');
-    node.append(...children);
-    return node;
-  }
-
-  function span(text, cls) {
-    const node = document.createElement('span');
-    node.textContent = text;
-    if (cls) node.className = cls;
-    return node;
+  function node(tag, text, cls) {
+    const n = document.createElement(tag);
+    if (text !== undefined) n.textContent = text;
+    if (cls) n.className = cls;
+    return n;
   }
 
   function render() {
-    const s = summarize(items, el.month.value);
+    document.querySelectorAll('[data-kind]').forEach((b) =>
+      b.classList.toggle('active', b.dataset.kind === state.kind)
+    );
+    document.querySelectorAll('[data-period]').forEach((b) =>
+      b.classList.toggle('active', b.dataset.period === state.period)
+    );
+
+    const { from, to } = periodRange(state.period, state.anchor);
+    const s = summarize(items, from, to, state.kind);
+
     el.income.textContent = fmt(s.income);
     el.expense.textContent = fmt(s.expense);
     el.balance.textContent = fmt(s.balance);
+    el.total.textContent = fmt(s.total);
+
+    let acc = 0;
+    const stops = s.top.map((c, i) => {
+      const start = acc;
+      acc += c.share * 100;
+      return `${COLORS[i % COLORS.length]} ${start}% ${acc}%`;
+    });
+    el.donut.style.background = stops.length
+      ? `conic-gradient(${stops.join(', ')})`
+      : 'conic-gradient(#272b35 0 100%)';
 
     el.categories.replaceChildren(
       ...allCategories(items).map((c) => {
-        const o = document.createElement('option');
+        const o = node('option');
         o.value = c;
         return o;
       })
     );
 
-    el.top.replaceChildren(
+    el.cats.replaceChildren(
       ...(s.top.length
-        ? s.top.map((c) => {
-            const bar = document.createElement('div');
-            bar.className = 'bar';
-            bar.style.width = (c.share * 100).toFixed(1) + '%';
-            return li(
-              span(c.category),
-              span(`${fmt(c.amount)} · ${(c.share * 100).toFixed(0)}%`, 'muted'),
-              bar
+        ? s.top.map((c, i) => {
+            const dot = node('span', '', 'dot');
+            dot.style.background = COLORS[i % COLORS.length];
+            const row = node('li', undefined, 'cat');
+            row.append(
+              dot,
+              node('span', c.category, 'name'),
+              node('span', (c.share * 100).toFixed(0) + '%', 'muted'),
+              node('span', fmt(c.amount), 'amount')
             );
+            return row;
           })
-        : [li(span('Расходов за месяц пока нет', 'muted'))])
+        : [node('li', 'Записей за период нет', 'muted')])
     );
 
     el.list.replaceChildren(
       ...(s.transactions.length
         ? s.transactions.map((t) => {
-            const row = li(
-              span(t.date.slice(8) + '.' + t.date.slice(5, 7), 'muted'),
-              span(t.category),
-              span(t.note || '', 'muted'),
-              span((t.type === 'income' ? '+' : '−') + fmt(t.amount), t.type)
-            );
-            const del = document.createElement('button');
-            del.textContent = '✕';
-            del.className = 'del';
+            const row = node('li');
+            const del = node('button', '✕', 'del');
             del.dataset.id = t.id;
             del.title = 'Удалить';
-            row.append(del);
+            row.append(
+              node('span', t.date.slice(8) + '.' + t.date.slice(5, 7), 'muted'),
+              node('span', t.category),
+              node('span', t.note || '', 'muted'),
+              node('span', (t.type === 'income' ? '+' : '−') + fmt(t.amount), t.type),
+              del
+            );
             return row;
           })
-        : [li(span('Записей за месяц нет', 'muted'))])
+        : [node('li', 'Записей за период нет', 'muted')])
     );
   }
 
@@ -161,6 +201,23 @@ function init() {
     save(localStorage, items);
     render();
   }
+
+  document.querySelectorAll('[data-kind]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.kind = b.dataset.kind;
+      render();
+    })
+  );
+  document.querySelectorAll('[data-period]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.period = b.dataset.period;
+      render();
+    })
+  );
+  el.anchor.addEventListener('input', () => {
+    if (el.anchor.value) state.anchor = el.anchor.value;
+    render();
+  });
 
   el.form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -182,12 +239,15 @@ function init() {
     el.amount.focus();
   });
 
-  el.list.addEventListener('click', (e) => {
-    const id = e.target.dataset?.id;
-    if (id && e.target.classList.contains('del')) commit(removeTransaction(items, id));
+  el.fab.addEventListener('click', () => {
+    el.form.scrollIntoView({ behavior: 'smooth' });
+    el.amount.focus();
   });
 
-  el.month.addEventListener('input', render);
+  el.list.addEventListener('click', (e) => {
+    const btn = e.target.closest('.del');
+    if (btn) commit(removeTransaction(items, btn.dataset.id));
+  });
 
   el.export.addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
@@ -227,5 +287,14 @@ function init() {
 if (typeof document !== 'undefined') {
   init();
 } else {
-  module.exports = { load, save, monthOf, summarize, addTransaction, removeTransaction, mergeTransactions, allCategories };
+  module.exports = {
+    load,
+    save,
+    periodRange,
+    summarize,
+    addTransaction,
+    removeTransaction,
+    mergeTransactions,
+    allCategories,
+  };
 }

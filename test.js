@@ -1,13 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarize, addTransaction, removeTransaction, mergeTransactions, monthOf, load, save } = require('./script.js');
-
-test('mergeTransactions добавляет только новые id', () => {
-  const incoming = [sample[0], { id: 'x', type: 'income', amount: 1, category: 'Еда', date: '2026-11-02' }];
-  const merged = mergeTransactions(sample, incoming);
-  assert.equal(merged.length, sample.length + 1);
-  assert.equal(merged.at(-1).id, 'x');
-});
+const {
+  summarize,
+  addTransaction,
+  removeTransaction,
+  mergeTransactions,
+  periodRange,
+  load,
+  save,
+} = require('./script.js');
 
 const sample = [
   { id: '1', type: 'expense', amount: 500, category: 'Работа', date: '2026-11-03' },
@@ -16,16 +17,17 @@ const sample = [
   { id: '4', type: 'income', amount: 5000, category: 'Зарплата', date: '2026-11-01' },
   { id: '5', type: 'expense', amount: 999, category: 'Заказ', date: '2026-10-31' },
 ];
+const NOV = ['2026-11-01', '2026-11-30'];
 
-test('summarize считает доходы, расходы и баланс только за месяц', () => {
-  const s = summarize(sample, '2026-11');
+test('summarize считает доходы, расходы и баланс за период', () => {
+  const s = summarize(sample, ...NOV);
   assert.equal(s.income, 5000);
   assert.equal(s.expense, 2000);
   assert.equal(s.balance, 3000);
 });
 
 test('top расходов отсортирован по сумме с долями', () => {
-  const s = summarize(sample, '2026-11');
+  const s = summarize(sample, ...NOV);
   assert.deepEqual(
     s.top.map((c) => [c.category, c.amount]),
     [['Подарок', 1200], ['Работа', 800]]
@@ -33,9 +35,24 @@ test('top расходов отсортирован по сумме с доля�
   assert.equal(s.top[0].share, 0.6);
 });
 
-test('пустой месяц даёт нули и пустой топ', () => {
-  const s = summarize(sample, '2030-01');
+test('kind=income даёт топ доходов и список только доходов', () => {
+  const s = summarize(sample, ...NOV, 'income');
+  assert.equal(s.total, 5000);
+  assert.deepEqual(s.top.map((c) => c.category), ['Зарплата']);
+  assert.equal(s.transactions.length, 1);
+});
+
+test('пустой период даёт нули и пустой топ', () => {
+  const s = summarize(sample, '2030-01-01', '2030-01-31');
   assert.deepEqual([s.income, s.expense, s.balance, s.top.length], [0, 0, 0, 0]);
+});
+
+test('periodRange: день, неделя (пн–вс), месяц, год', () => {
+  assert.deepEqual(periodRange('day', '2026-11-25'), { from: '2026-11-25', to: '2026-11-25' });
+  assert.deepEqual(periodRange('week', '2026-11-25'), { from: '2026-11-23', to: '2026-11-29' });
+  assert.deepEqual(periodRange('week', '2026-11-01'), { from: '2026-10-26', to: '2026-11-01' });
+  assert.deepEqual(periodRange('month', '2026-02-10'), { from: '2026-02-01', to: '2026-02-28' });
+  assert.deepEqual(periodRange('year', '2026-11-25'), { from: '2026-01-01', to: '2026-12-31' });
 });
 
 test('addTransaction приводит сумму к числу и даёт id, не мутируя исходный массив', () => {
@@ -51,8 +68,11 @@ test('removeTransaction удаляет по id', () => {
   assert.equal(removeTransaction(sample, '1').some((t) => t.id === '1'), false);
 });
 
-test('monthOf берёт YYYY-MM', () => {
-  assert.equal(monthOf('2026-11-25'), '2026-11');
+test('mergeTransactions добавляет только новые id', () => {
+  const incoming = [sample[0], { id: 'x', type: 'income', amount: 1, category: 'Еда', date: '2026-11-02' }];
+  const merged = mergeTransactions(sample, incoming);
+  assert.equal(merged.length, sample.length + 1);
+  assert.equal(merged.at(-1).id, 'x');
 });
 
 test('load возвращает [] при битых данных, save/load round-trip', () => {

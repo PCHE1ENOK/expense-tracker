@@ -3,19 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Финансовый трекер</title>
+  <title>Учёт расходов и доходов</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <h1>💰 Финансовый трекер</h1>
-      <label>Месяц <input type="month" id="month"></label>
+      <h1>💰 Учёт</h1>
       <div class="tools">
         <button type="button" id="export" class="ghost">Экспорт</button>
         <label class="btn ghost">Импорт<input type="file" id="import" accept="application/json" hidden></label>
       </div>
     </header>
+
+    <nav class="seg">
+      <button type="button" data-kind="expense" class="active">Расходы</button>
+      <button type="button" data-kind="income">Доходы</button>
+    </nav>
+    <nav class="seg">
+      <button type="button" data-period="day">День</button>
+      <button type="button" data-period="week">Неделя</button>
+      <button type="button" data-period="month" class="active">Месяц</button>
+      <button type="button" data-period="year">Год</button>
+    </nav>
+    <div class="toolbar">
+      <input type="date" id="anchor" aria-label="Дата периода">
+    </div>
+
+    <section class="panel summary">
+      <div id="donut" class="donut"><span id="total">0 ₽</span></div>
+      <ul id="cats" class="cats"></ul>
+    </section>
 
     <section class="cards">
       <div class="card"><span>Доходы</span><strong id="income" class="income">0</strong></div>
@@ -24,6 +42,11 @@
     </section>
 
     <section class="panel">
+      <h2>Записи</h2>
+      <ul id="list" class="list"></ul>
+    </section>
+
+    <section class="panel" id="formPanel">
       <h2>Новая запись</h2>
       <form id="form" class="form">
         <select id="type">
@@ -38,18 +61,8 @@
         <button type="submit">Добавить</button>
       </form>
     </section>
-
-    <div class="grid">
-      <section class="panel">
-        <h2>Больше всего потрачено</h2>
-        <ul id="top" class="bars"></ul>
-      </section>
-      <section class="panel">
-        <h2>Записи за месяц</h2>
-        <ul id="list" class="list"></ul>
-      </section>
-    </div>
   </main>
+  <button type="button" id="fab" class="fab" title="Добавить запись">+</button>
   <script src="script.js"></script>
 </body>
 </html>
