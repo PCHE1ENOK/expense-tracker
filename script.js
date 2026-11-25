@@ -135,8 +135,8 @@ function init() {
     dnote: $('dnote'),
   };
 
-  const fmt = (n) =>
-    n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
+  const fmtNum = (n) => n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n) => fmtNum(n) + ' BYN';
 
   const state = { kind: 'expense', period: 'month', anchor: todayLocal(), view: 'records' };
   let items = load(localStorage);
@@ -178,7 +178,7 @@ function init() {
     el.income.textContent = fmt(sIncome.income);
     el.expense.textContent = fmt(sExpense.expense);
     el.balance.textContent = fmt(s.balance);
-    el.total.textContent = fmt(s.total);
+    el.total.textContent = fmtNum(s.total);
 
     let acc = 0;
     const stops = s.top.map((c, i) => {
