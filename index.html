@@ -21,11 +21,6 @@
     </header>
 
     <nav class="seg">
-      <button type="button" data-kind="expense" class="active">Расходы</button>
-      <button type="button" data-kind="income">Доходы</button>
-      <button type="button" data-view="deferred">Отложенное</button>
-    </nav>
-    <nav class="seg">
       <button type="button" data-period="day">День</button>
       <button type="button" data-period="week">Неделя</button>
       <button type="button" data-period="month" class="active">Месяц</button>
@@ -95,6 +90,11 @@
     </section>
   </main>
   <button type="button" id="fab" class="fab" title="Добавить запись">+</button>
+  <nav class="tabbar">
+    <button type="button" data-kind="expense" class="active"><span>💸</span>Расходы</button>
+    <button type="button" data-kind="income"><span>💰</span>Доходы</button>
+    <button type="button" data-view="deferred"><span>🛒</span>Отложенное</button>
+  </nav>
   <script src="script.js"></script>
 </body>
 </html>
