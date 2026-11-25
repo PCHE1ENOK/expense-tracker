@@ -15,17 +15,10 @@
     <header class="topbar">
       <h1>💰 Учёт</h1>
       <div class="tools">
-        <button type="button" id="auth" class="ghost">Войти через GitHub</button>
         <button type="button" id="export" class="ghost">Экспорт</button>
         <label class="btn ghost">Импорт<input type="file" id="import" accept="application/json" hidden></label>
       </div>
     </header>
-    <p id="syncState" class="muted sync">Локально, без входа</p>
-    <section class="panel" id="devicePanel" hidden>
-      <h2>Вход через GitHub</h2>
-      <p>Откройте <a id="verifyLink" target="_blank" rel="noopener"></a> и введите код:</p>
-      <p class="code" id="userCode"></p>
-    </section>
 
     <nav class="seg">
       <button type="button" data-period="day">День</button>

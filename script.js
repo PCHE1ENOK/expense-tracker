@@ -3,8 +3,6 @@ const DEFERRED_KEY = 'expense-tracker-deferred-v1';
 const GIST_FILE = 'expense-tracker.json';
 // Client ID OAuth App с включённым Device Flow (scope: gist). Заполнить вручную.
 const GITHUB_CLIENT_ID = 'REPLACE_WITH_CLIENT_ID';
-const TOKEN_KEY = 'expense-tracker-gh-token';
-const GIST_ID_KEY = 'expense-tracker-gist-id';
 const DEFAULT_CATEGORIES = ['Работа', 'Подарок', 'Заказ', 'Еда', 'Транспорт', 'Покупки'];
 const COLORS = ['#4DD4F5', '#5B7CFA', '#8C97F7', '#B9A7FF', '#F7A8C9', '#7FE6D0', '#A3C4FF', '#E8EAFF'];
 
@@ -142,11 +140,6 @@ function todayLocal() {
 function init() {
   const $ = (id) => document.getElementById(id);
   const el = {
-    auth: $('auth'),
-    syncState: $('syncState'),
-    devicePanel: $('devicePanel'),
-    userCode: $('userCode'),
-    verifyLink: $('verifyLink'),
     anchor: $('anchor'),
     export: $('export'),
     import: $('import'),
@@ -296,127 +289,13 @@ function init() {
     items = next;
     save(localStorage, items);
     render();
-    scheduleCloud();
   }
 
   function commitDeferred(next) {
     deferredItems = next;
     save(localStorage, deferredItems, DEFERRED_KEY);
     render();
-    scheduleCloud();
   }
-
-  // ----- GitHub: вход (Device Flow) и синхронизация с приватным Gist -----
-  const localData = () => ({ transactions: items, deferred: deferredItems });
-  const setState = (text) => {
-    el.syncState.textContent = text;
-  };
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-  async function gh(path, opts = {}) {
-    const headers = { Accept: 'application/vnd.github+json', Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` };
-    if (opts.body) headers['Content-Type'] = 'application/json';
-    const res = await fetch(`https://api.github.com${path}`, {
-      method: opts.method || 'GET',
-      headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-    });
-    if (!res.ok) throw new Error(`GitHub ${res.status}`);
-    return res.json();
-  }
-
-  async function deviceLogin() {
-    if (GITHUB_CLIENT_ID.startsWith('REPLACE')) throw new Error('Не задан GITHUB_CLIENT_ID');
-    const headers = { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' };
-    const code = await fetch('https://github.com/login/device/code', {
-      method: 'POST',
-      headers,
-      body: new URLSearchParams({ client_id: GITHUB_CLIENT_ID, scope: 'gist' }),
-    }).then((r) => r.json());
-    el.userCode.textContent = code.user_code;
-    el.verifyLink.href = code.verification_uri;
-    el.verifyLink.textContent = code.verification_uri;
-    el.devicePanel.hidden = false;
-
-    let wait = (code.interval || 5) * 1000;
-    const until = Date.now() + code.expires_in * 1000;
-    while (Date.now() < until) {
-      await sleep(wait);
-      const t = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers,
-        body: new URLSearchParams({
-          client_id: GITHUB_CLIENT_ID,
-          device_code: code.device_code,
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        }),
-      }).then((r) => r.json());
-      if (t.access_token) {
-        localStorage.setItem(TOKEN_KEY, t.access_token);
-        el.devicePanel.hidden = true;
-        return;
-      }
-      if (t.error === 'slow_down') wait += 5000;
-      else if (t.error !== 'authorization_pending') throw new Error(t.error_description || 'Вход не выполнен');
-    }
-    throw new Error('Код истёк, попробуйте ещё раз');
-  }
-
-  // Загружает Gist, сливает с локальными данными, сохраняет результат в Gist и локально
-  async function syncNow() {
-    let id = localStorage.getItem(GIST_ID_KEY);
-    if (!id) {
-      const list = await gh('/gists?per_page=100');
-      id = list.find((g) => g.files && g.files[GIST_FILE])?.id ?? null;
-    }
-    const remote = id ? readGist(await gh(`/gists/${id}`)) : null;
-    const merged = mergeData(localData(), remote || { transactions: [], deferred: [] });
-    if (id) {
-      await gh(`/gists/${id}`, { method: 'PATCH', body: gistBody(merged) });
-    } else {
-      id = (await gh('/gists', { method: 'POST', body: gistBody(merged, true) })).id;
-    }
-    localStorage.setItem(GIST_ID_KEY, id);
-    items = merged.transactions;
-    deferredItems = merged.deferred;
-    save(localStorage, items);
-    save(localStorage, deferredItems, DEFERRED_KEY);
-    render();
-    setState('Синхронизировано');
-  }
-
-  // Сохранение с задержкой, чтобы не слать запрос на каждое нажатие
-  let cloudTimer = null;
-  function scheduleCloud() {
-    if (!localStorage.getItem(TOKEN_KEY)) return;
-    clearTimeout(cloudTimer);
-    setState('Сохранение…');
-    cloudTimer = setTimeout(() => syncNow().catch(() => setState('Ошибка синхронизации')), 3000);
-  }
-
-  function updateAuthUi() {
-    el.auth.textContent = localStorage.getItem(TOKEN_KEY) ? 'Выйти' : 'Войти через GitHub';
-  }
-
-  el.auth.addEventListener('click', async () => {
-    if (localStorage.getItem(TOKEN_KEY)) {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(GIST_ID_KEY);
-      clearTimeout(cloudTimer);
-      setState('Локально, без входа');
-      updateAuthUi();
-      return;
-    }
-    try {
-      setState('Вход…');
-      await deviceLogin();
-      setState('Загрузка…');
-      await syncNow();
-    } catch (e) {
-      setState(e.message);
-    }
-    updateAuthUi();
-  });
 
   document.querySelectorAll('[data-kind]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -563,11 +442,6 @@ function init() {
   });
 
   render();
-  updateAuthUi();
-  if (localStorage.getItem(TOKEN_KEY)) {
-    setState('Загрузка…');
-    syncNow().catch(() => setState('Ошибка синхронизации'));
-  }
 }
 
 if (typeof document !== 'undefined') {
